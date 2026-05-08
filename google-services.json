@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "491261152573",
+    "project_id": "mvpwhisp",
+    "storage_bucket": "mvpwhisp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:491261152573:android:ca55f0ed140d3e58004954",
+        "android_client_info": {
+          "package_name": "com.mvpwhisp.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDDDBdsDlXcroI0g9KJefpwvmw9nXreiUE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
