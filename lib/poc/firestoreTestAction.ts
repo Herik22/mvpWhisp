@@ -13,7 +13,6 @@ import {
   showIncomingCallKeepPoc,
 } from "@/lib/poc/iosCallKeep";
 
-/** Colección y documento que debes crear en Firestore (campos `runIos`, `runAndroid`). */
 export const TEST_ACTION_COLLECTION = "testAction";
 export const TEST_ACTION_DOC_ID = "control";
 
@@ -38,15 +37,13 @@ export type FirestoreTestActionStatus =
   | { kind: "listening" }
   | { kind: "error"; message: string };
 
-/**
- * Escucha `testAction/control`. Dispara acciones solo en flanco ascendente (false → true)
- * para no repetir mientras el doc siga en `true`.
- */
 export function useFirestoreTestActionPoc(enabled: boolean): {
   status: FirestoreTestActionStatus;
   lastTrigger: string | null;
 } {
-  const [status, setStatus] = useState<FirestoreTestActionStatus>({ kind: "idle" });
+  const [status, setStatus] = useState<FirestoreTestActionStatus>({
+    kind: "idle",
+  });
   const [lastTrigger, setLastTrigger] = useState<string | null>(null);
   const prevRef = useRef<{ runIos: boolean; runAndroid: boolean } | null>(null);
   const iosSetupDoneRef = useRef(false);
@@ -54,14 +51,6 @@ export function useFirestoreTestActionPoc(enabled: boolean): {
   useEffect(() => {
     if (!enabled) {
       setStatus({ kind: "idle" });
-      return;
-    }
-
-    if (Platform.OS === "web") {
-      setStatus({
-        kind: "error",
-        message: "Firestore POC: no disponible en web (usa dev client iOS/Android).",
-      });
       return;
     }
 

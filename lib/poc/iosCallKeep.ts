@@ -2,22 +2,13 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import type RNCallKeepType from "react-native-callkeep";
 
-/**
- * iOS (ver `app.json`):
- * - `UIBackgroundModes`: audio + voip (llamadas / audio en segundo plano; voip para PushKit más adelante).
- * - `NSMicrophoneUsageDescription` (CallKit / audio de llamada).
- * - Entitlement time-sensitive para notificaciones `interruptionLevel: "timeSensitive"`:
- *   activar también en developer.apple.com → Identifiers → tu App ID → Time Sensitive Notifications.
- *
- * CallKit no funciona en simulador: solo dispositivo físico.
- * Push VoIP real requiere más pasos (PushKit, report new incoming call, etc.) — fuera de este POC.
- */
-
 let callKeepModule: typeof RNCallKeepType | null = null;
 
 function getCallKeep(): typeof RNCallKeepType {
   if (Platform.OS !== "ios") {
-    throw new Error("CallKeep POC solo está pensado para iOS en este proyecto.");
+    throw new Error(
+      "CallKeep POC solo está pensado para iOS en este proyecto.",
+    );
   }
   if (!callKeepModule) {
     const mod = require("react-native-callkeep")
@@ -28,6 +19,8 @@ function getCallKeep(): typeof RNCallKeepType {
 }
 
 let activeCallUuid: string | null = null;
+let isSetupDone = false;
+let areListenersAttached = false;
 
 function randomUuid(): string {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
@@ -38,21 +31,86 @@ function randomUuid(): string {
 }
 
 export async function setupCallKeepPoc(): Promise<void> {
+  if (isSetupDone) {
+    console.log("[poc:ios] CallKeep.setup ya estaba hecho, skip");
+    return;
+  }
   const ck = getCallKeep();
   const ok = await ck.setup({
     ios: {
       appName: "Whisp",
+      supportsVideo: false,
+      maximumCallGroups: "1",
+      maximumCallsPerCallGroup: "1",
     },
     android: {
       alertTitle: "Whisp",
-      alertDescription: "POC — permisos de llamada (no usado en este POC iOS-only)",
+      alertDescription:
+        "POC — permisos de llamada (no usado en este POC iOS-only)",
       cancelButton: "Cancelar",
       okButton: "OK",
       additionalPermissions: [],
     },
   });
   ck.setReachable();
+  isSetupDone = true;
   console.log("[poc:ios] CallKeep.setup + setReachable", { ok });
+}
+
+export function setupCallKeepEventListeners(): void {
+  if (Platform.OS !== "ios") return;
+  if (areListenersAttached) return;
+  areListenersAttached = true;
+
+  const ck = getCallKeep();
+
+  ck.addEventListener("didDisplayIncomingCall", (event) => {
+    console.log("[poc:ios] CallKeep didDisplayIncomingCall", event);
+    if (event && typeof event === "object" && "callUUID" in event) {
+      activeCallUuid = (event as { callUUID: string }).callUUID;
+    }
+  });
+
+  ck.addEventListener("answerCall", ({ callUUID }) => {
+    console.log("[poc:ios] CallKeep answerCall", { callUUID });
+    activeCallUuid = callUUID;
+  });
+
+  ck.addEventListener("endCall", ({ callUUID }) => {
+    console.log("[poc:ios] CallKeep endCall", { callUUID });
+    if (activeCallUuid === callUUID) activeCallUuid = null;
+  });
+
+  ck.addEventListener("didActivateAudioSession", () => {
+    console.log("[poc:ios] CallKeep didActivateAudioSession");
+  });
+
+  ck.addEventListener("didDeactivateAudioSession", () => {
+    console.log("[poc:ios] CallKeep didDeactivateAudioSession");
+  });
+
+  ck.addEventListener("didPerformSetMutedCallAction", ({ muted, callUUID }) => {
+    console.log("[poc:ios] CallKeep didPerformSetMutedCallAction", {
+      muted,
+      callUUID,
+    });
+  });
+
+  console.log("[poc:ios] CallKeep listeners attached");
+}
+
+export function teardownCallKeepEventListeners(): void {
+  if (Platform.OS !== "ios") return;
+  if (!areListenersAttached) return;
+  const ck = getCallKeep();
+  ck.removeEventListener("didDisplayIncomingCall");
+  ck.removeEventListener("answerCall");
+  ck.removeEventListener("endCall");
+  ck.removeEventListener("didActivateAudioSession");
+  ck.removeEventListener("didDeactivateAudioSession");
+  ck.removeEventListener("didPerformSetMutedCallAction");
+  areListenersAttached = false;
+  console.log("[poc:ios] CallKeep listeners removed");
 }
 
 export function showIncomingCallKeepPoc(): void {
@@ -103,7 +161,6 @@ export async function scheduleTimeSensitiveNotificationPoc(): Promise<void> {
     title: "Whisp — time sensitive",
     body: "Prueba de interrupción local (timeSensitive)",
     sound: "default",
-    // iOS 15+ — requiere capability / configuración en prebuild; ver plugin expo-notifications.
     interruptionLevel: "timeSensitive",
   };
 

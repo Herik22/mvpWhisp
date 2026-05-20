@@ -4,10 +4,11 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 export default function Index() {
   return (
     <View style={styles.wrap}>
-      <Text style={styles.hint}>mvpWhisp</Text>
+      <Text style={styles.title}>Whisp</Text>
+      <Text style={styles.subtitle}>MVP</Text>
       <Link href="/interruptions-poc" asChild>
         <Pressable style={styles.link}>
-          <Text style={styles.linkText}>Abrir Interruption POC</Text>
+          <Text style={styles.linkText}>Abrir panel de acciones</Text>
         </Pressable>
       </Link>
     </View>
@@ -21,16 +22,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 24,
     backgroundColor: "#0c0c0f",
-    gap: 16,
+    gap: 10,
   },
-  hint: { color: "#71717a", fontSize: 14 },
+  title: { color: "#fafafa", fontSize: 34, fontWeight: "800" },
+  subtitle: { color: "#a1a1aa", fontSize: 14, marginBottom: 10 },
   link: {
-    backgroundColor: "#27272a",
+    backgroundColor: "#2563eb",
     paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    paddingHorizontal: 22,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#3f3f46",
+    borderColor: "#1d4ed8",
   },
   linkText: { color: "#fafafa", fontSize: 16, fontWeight: "600" },
 });

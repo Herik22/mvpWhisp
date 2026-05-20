@@ -41,3 +41,8 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Firebase / Google Cloud — nunca subir claves de cuenta de servicio
+*-firebase-adminsdk-*.json
+**/firebase-adminsdk*.json
+scripts/*adminsdk*.json

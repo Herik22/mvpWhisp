@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import {
   Alert,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -12,18 +13,20 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { playLoopSound, stopSound } from "@/lib/poc/audio";
 import {
   createFullScreenChannelPoc,
   requestNotificationPermissionPoc,
   showLocalFullScreenNotificationPoc,
   startVibrationLoopPoc,
-  stopVibrationPoc,
+  stopVibrationPoc
 } from "@/lib/poc/androidInterruption";
+import { getAndroidFcmTokenForPoc } from "@/lib/poc/androidMessaging";
+import { playLoopSound, stopSound } from "@/lib/poc/audio";
 import {
   TEST_ACTION_DOC_PATH,
   useFirestoreTestActionPoc,
 } from "@/lib/poc/firestoreTestAction";
+import { AppBlockerPocCard } from "@/components/AppBlockerPocCard";
 import {
   endActiveCallKeepPoc,
   scheduleTimeSensitiveNotificationPoc,
@@ -42,7 +45,6 @@ export function InterruptionsPOCScreen() {
   const [firestoreListen, setFirestoreListen] = useState(true);
   const { status: firestoreStatus, lastTrigger: firestoreLastTrigger } =
     useFirestoreTestActionPoc(firestoreListen && Platform.OS !== "web");
-  const osLabel = Platform.OS === "ios" ? "iOS" : "Android";
 
   const run = useCallback(async (label: string, fn: () => Promise<void>) => {
     console.log(`[poc] action: ${label}`);
@@ -56,31 +58,14 @@ export function InterruptionsPOCScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Whisp Interruption POC</Text>
-        <Text style={styles.sub}>
-          Sistema operativo: <Text style={styles.bold}>{osLabel}</Text>
-        </Text>
+        <Text style={styles.title}>Whisp</Text>
+        <Text style={styles.subtitle}>Acciones</Text>
 
-        <Section title="Firestore remoto (testAction)" />
-        {Platform.OS === "web" ? (
-          <Text style={styles.muted}>
-            Listener desactivado en web; usa iOS o Android con dev client.
-          </Text>
-        ) : (
+        <Card title="0) Conexión remota (Firestore)">
+          (
           <>
-            <Text style={styles.hint}>
-              Crea el documento{" "}
-              <Text style={styles.bold}>{TEST_ACTION_DOC_PATH}</Text> con campos
-              booleanos <Text style={styles.bold}>runAndroid</Text> y{" "}
-              <Text style={styles.bold}>runIos</Text>. Solo reacciona cuando el
-              valor pasa de <Text style={styles.bold}>false</Text> a{" "}
-              <Text style={styles.bold}>true</Text> (vuelve a poner{" "}
-              <Text style={styles.bold}>false</Text> antes de otro disparo).
-              Reglas de Firestore: en desarrollo puedes permitir lectura/escritura
-              temporal para esta colección.
-            </Text>
             <View style={styles.row}>
-              <Text style={styles.rowLabel}>Escuchar Firestore</Text>
+              <Text style={styles.rowLabel}>Escuchar</Text>
               <Switch
                 value={firestoreListen}
                 onValueChange={setFirestoreListen}
@@ -88,149 +73,197 @@ export function InterruptionsPOCScreen() {
                 thumbColor="#fafafa"
               />
             </View>
-            <Text style={styles.mono}>
-              Estado:{" "}
+            <Text style={styles.meta}>
               {firestoreStatus.kind === "listening"
-                ? "escuchando"
+                ? "Activo"
                 : firestoreStatus.kind === "idle"
-                  ? "inactivo"
-                  : `error: ${firestoreStatus.message}`}
+                  ? "Inactivo"
+                  : `Error: ${firestoreStatus.message}`}
             </Text>
             {firestoreLastTrigger ? (
-              <Text style={styles.mono}>Último disparo: {firestoreLastTrigger}</Text>
+              <Text style={styles.meta}>Último: {firestoreLastTrigger}</Text>
             ) : null}
+            {false && (
+              <SecondaryButton
+                label="Ver qué documento modificar"
+                onPress={() => {
+                  Alert.alert(
+                    "Firestore (testAction)",
+                    `Documento:\n${TEST_ACTION_DOC_PATH}\n\nCampos booleanos:\n- runAndroid\n- runIos\n\nDispara cambiando false → true (y vuelve a false antes del próximo).`,
+                  );
+                }}
+              />
+            )}
           </>
+          )
+        </Card>
+
+        <Card title="1) Básico">
+          <PrimaryButton
+            label="1) Reproducir sonido"
+            onPress={() =>
+              run("Play loop sound", async () => {
+                await playLoopSound();
+              })
+            }
+          />
+          <SecondaryButton
+            label="2) Detener sonido"
+            onPress={() =>
+              run("Stop sound", async () => {
+                await stopSound();
+              })
+            }
+          />
+          <SecondaryButton
+            label="3) Mostrar alerta en la app"
+            onPress={() => {
+              console.log("[poc] action: Open in-app alert screen");
+              setInAppAlertOpen(true);
+            }}
+          />
+        </Card>
+
+        {Platform.OS === "android" && (
+          <Card title="2) Android">
+            (
+            <>
+              <PrimaryButton
+                label="1) Permitir notificaciones"
+                onPress={() =>
+                  run(
+                    "Request notification permissions",
+                    requestNotificationPermissionPoc,
+                  )
+                }
+              />
+              <SecondaryButton
+                label="2) Crear canal pantalla completa"
+                onPress={() =>
+                  run("Create full-screen channel", createFullScreenChannelPoc)
+                }
+              />
+              <SecondaryButton
+                label="3) Mostrar pantalla completa"
+                onPress={() =>
+                  run(
+                    "Show local full-screen intent",
+                    showLocalFullScreenNotificationPoc,
+                  )
+                }
+              />
+              <SecondaryButton
+                label="4) Iniciar vibración"
+                onPress={() => {
+                  console.log("[poc] action: Start vibration loop");
+                  try {
+                    startVibrationLoopPoc();
+                  } catch (e) {
+                    handleError("Start vibration loop", e);
+                  }
+                }}
+              />
+              <SecondaryButton
+                label="5) Detener vibración"
+                onPress={() => {
+                  console.log("[poc] action: Stop vibration");
+                  try {
+                    stopVibrationPoc();
+                  } catch (e) {
+                    handleError("Stop vibration", e);
+                  }
+                }}
+              />
+              <SecondaryButton
+                label="6) Obtener token FCM (ver consola)"
+                onPress={() =>
+                  run("FCM getToken", async () => {
+                    const token = await getAndroidFcmTokenForPoc();
+                    if (token) {
+                      console.log(
+                        "[poc:android:fcm] TOKEN (copiar para script):\n",
+                        token,
+                      );
+                      Alert.alert(
+                        "Token FCM",
+                        "Está en la consola de Metro (texto largo). Úsalo en tu backend / script FCM HTTP v1 para Android.",
+                      );
+                    } else {
+                      throw new Error(
+                        "Sin token (¿permisos o build sin Messaging?)",
+                      );
+                    }
+                  })
+                }
+              />
+              <SecondaryButton
+                label="7) Abrir ajustes de Whisp (permisos)"
+                onPress={() => {
+                  void Linking.openSettings();
+                }}
+              />
+              <Text style={styles.note}>
+                Push: solo data + priority HIGH (FCM v1). El banner arriba es
+                normal con otra app al frente y pantalla desbloqueada; el FSI
+                depende del sistema. Prueba con pantalla bloqueada. Canal
+                Notifee whisp_poc_fullscreen_v4: tras cambiar el id, pulsa
+                «Crear canal» o reinstala. En Android 14+ usa el botón 8 y
+                activa pantalla completa para Whisp. Si añadiste módulos nativos
+                (p. ej. expo-intent-launcher), ejecuta npx expo run:android para
+                que funcione el botón 8. Si en consola ves OK pero no ves aviso,
+                mira el log [poc:android:notifee:DIAG] tras el push (canal
+                bloqueado o DENIED) y usa el botón 9.
+              </Text>
+            </>
+            )
+          </Card>
         )}
 
-        <Section title="Common tests" />
-        <PocButton
-          label="Play loop sound"
-          onPress={() =>
-            run("Play loop sound", async () => {
-              await playLoopSound();
-            })
-          }
-        />
-        <PocButton
-          label="Stop sound"
-          onPress={() =>
-            run("Stop sound", async () => {
-              await stopSound();
-            })
-          }
-        />
-        <PocButton
-          label="Open in-app alert screen"
-          onPress={() => {
-            console.log("[poc] action: Open in-app alert screen");
-            setInAppAlertOpen(true);
-          }}
-        />
-
-        <Section title="Android tests" />
-        {Platform.OS === "android" ? (
-          <>
-            <PocButton
-              label="Request notification permissions"
-              onPress={() =>
-                run("Request notification permissions", requestNotificationPermissionPoc)
-              }
-            />
-            <PocButton
-              label="Create full-screen channel"
-              onPress={() =>
-                run("Create full-screen channel", createFullScreenChannelPoc)
-              }
-            />
-            <PocButton
-              label="Show local full-screen intent"
-              onPress={() =>
-                run(
-                  "Show local full-screen intent",
-                  showLocalFullScreenNotificationPoc,
-                )
-              }
-            />
-            <Text style={styles.hint}>
-              Full-screen: con la app abierta suele ser solo heads-up. Prueba con
-              la app en segundo plano o pantalla bloqueada. En Android 14+:
-              Ajustes → Apps → Whisp → permitir notificación a pantalla
-              completa. Tras cambiar permisos en app.json, recompila el dev
-              client.
-            </Text>
-            <PocButton
-              label="Start vibration loop"
-              onPress={() => {
-                console.log("[poc] action: Start vibration loop");
-                try {
-                  startVibrationLoopPoc();
-                } catch (e) {
-                  handleError("Start vibration loop", e);
+        {Platform.OS === "ios" && (
+          <Card title="3) iOS">
+            (
+            <>
+              <PrimaryButton
+                label="1) Configurar llamadas (CallKeep)"
+                onPress={() => run("Setup CallKeep", setupCallKeepPoc)}
+              />
+              <SecondaryButton
+                label="2) Simular llamada entrante"
+                onPress={() => {
+                  console.log("[poc] action: Show incoming CallKeep alert");
+                  try {
+                    showIncomingCallKeepPoc();
+                  } catch (e) {
+                    handleError("Show incoming CallKeep alert", e);
+                  }
+                }}
+              />
+              <SecondaryButton
+                label="3) Finalizar llamada activa"
+                onPress={() => {
+                  console.log("[poc] action: End CallKeep call");
+                  try {
+                    endActiveCallKeepPoc();
+                  } catch (e) {
+                    handleError("End CallKeep call", e);
+                  }
+                }}
+              />
+              <SecondaryButton
+                label="4) Permitir + mostrar notif. time-sensitive"
+                onPress={() =>
+                  run(
+                    "Show local time-sensitive notification",
+                    scheduleTimeSensitiveNotificationPoc,
+                  )
                 }
-              }}
-            />
-            <PocButton
-              label="Stop vibration"
-              onPress={() => {
-                console.log("[poc] action: Stop vibration");
-                try {
-                  stopVibrationPoc();
-                } catch (e) {
-                  handleError("Stop vibration", e);
-                }
-              }}
-            />
-          </>
-        ) : (
-          <Text style={styles.muted}>No disponible en esta plataforma.</Text>
+              />
+            </>
+            )
+          </Card>
         )}
 
-        <Section title="iOS tests" />
-        {Platform.OS === "ios" ? (
-          <>
-            <Text style={styles.hint}>
-              CallKit solo en iPhone físico (no simulador). Si el build firma mal por
-              time-sensitive, habilita la capability en el App ID de Apple Developer.
-            </Text>
-            <PocButton
-              label="Setup CallKeep"
-              onPress={() => run("Setup CallKeep", setupCallKeepPoc)}
-            />
-            <PocButton
-              label="Show incoming CallKeep alert"
-              onPress={() => {
-                console.log("[poc] action: Show incoming CallKeep alert");
-                try {
-                  showIncomingCallKeepPoc();
-                } catch (e) {
-                  handleError("Show incoming CallKeep alert", e);
-                }
-              }}
-            />
-            <PocButton
-              label="End CallKeep call"
-              onPress={() => {
-                console.log("[poc] action: End CallKeep call");
-                try {
-                  endActiveCallKeepPoc();
-                } catch (e) {
-                  handleError("End CallKeep call", e);
-                }
-              }}
-            />
-            <PocButton
-              label="Show local time-sensitive notification"
-              onPress={() =>
-                run(
-                  "Show local time-sensitive notification",
-                  scheduleTimeSensitiveNotificationPoc,
-                )
-              }
-            />
-          </>
-        ) : (
-          <Text style={styles.muted}>No disponible en esta plataforma.</Text>
-        )}
+        {Platform.OS !== "web" && <AppBlockerPocCard run={run} />}
       </ScrollView>
 
       <Modal
@@ -241,10 +274,8 @@ export function InterruptionsPOCScreen() {
       >
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Alerta en la app</Text>
-            <Text style={styles.modalBody}>
-              Esto simula un modal de alerta dentro de Whisp (sin sistema).
-            </Text>
+            <Text style={styles.modalTitle}>Alerta</Text>
+            <Text style={styles.modalBody}>Mensaje de ejemplo.</Text>
             <Pressable
               style={styles.modalBtn}
               onPress={() => {
@@ -261,20 +292,31 @@ export function InterruptionsPOCScreen() {
   );
 }
 
-function Section({ title }: { title: string }) {
-  return <Text style={styles.section}>{title}</Text>;
+function Card({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>{title}</Text>
+      <View style={styles.cardBody}>{children}</View>
+    </View>
+  );
 }
 
-function PocButton({
+function BaseButton({
   label,
   onPress,
+  variant,
 }: {
   label: string;
   onPress: () => void;
+  variant: "primary" | "secondary";
 }) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.btn, pressed && styles.btnPressed]}
+      style={({ pressed }) => [
+        styles.btn,
+        variant === "primary" ? styles.btnPrimary : styles.btnSecondary,
+        pressed && styles.btnPressed,
+      ]}
       onPress={onPress}
     >
       <Text style={styles.btnText}>{label}</Text>
@@ -282,44 +324,57 @@ function PocButton({
   );
 }
 
+function PrimaryButton({
+  label,
+  onPress,
+}: {
+  label: string;
+  onPress: () => void;
+}) {
+  return <BaseButton label={label} onPress={onPress} variant="primary" />;
+}
+
+function SecondaryButton({
+  label,
+  onPress,
+}: {
+  label: string;
+  onPress: () => void;
+}) {
+  return <BaseButton label={label} onPress={onPress} variant="secondary" />;
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0c0c0f" },
-  scroll: { padding: 20, paddingBottom: 40, gap: 10 },
+  scroll: { padding: 20, paddingBottom: 40, gap: 12 },
   title: {
-    fontSize: 22,
-    fontWeight: "700",
+    fontSize: 26,
+    fontWeight: "800",
     color: "#f4f4f5",
-    marginBottom: 6,
   },
-  sub: { fontSize: 15, color: "#a1a1aa", marginBottom: 16 },
-  bold: { fontWeight: "700", color: "#e4e4e7" },
-  section: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#71717a",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginTop: 18,
-    marginBottom: 6,
+  subtitle: { fontSize: 14, color: "#a1a1aa", marginBottom: 10 },
+  note: { fontSize: 13, color: "#71717a" },
+  meta: { fontSize: 12, color: "#a1a1aa" },
+  card: {
+    backgroundColor: "#111114",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#27272a",
+    padding: 14,
+    gap: 10,
   },
-  muted: { fontSize: 14, color: "#52525b", fontStyle: "italic" },
-  hint: {
-    fontSize: 12,
-    color: "#71717a",
-    lineHeight: 17,
-    marginTop: -4,
-    marginBottom: 4,
-  },
+  cardTitle: { fontSize: 13, fontWeight: "700", color: "#d4d4d8" },
+  cardBody: { gap: 10 },
   btn: {
-    backgroundColor: "#27272a",
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#3f3f46",
   },
+  btnPrimary: { backgroundColor: "#2563eb", borderColor: "#1d4ed8" },
+  btnSecondary: { backgroundColor: "#18181b", borderColor: "#3f3f46" },
   btnPressed: { opacity: 0.85 },
-  btnText: { color: "#fafafa", fontSize: 16 },
+  btnText: { color: "#fafafa", fontSize: 16, fontWeight: "600" },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.55)",
@@ -352,12 +407,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 8,
+    paddingVertical: 2,
   },
-  rowLabel: { fontSize: 16, color: "#e4e4e7" },
-  mono: {
-    fontSize: 12,
-    color: "#a1a1aa",
-    fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }),
-  },
+  rowLabel: { fontSize: 15, color: "#e4e4e7", fontWeight: "600" },
 });

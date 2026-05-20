@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "mvpWhisp",
+    "name": "MVP - Whisp",
     "slug": "mvpWhisp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,14 +11,23 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mvpwhisp.app",
+      "appleTeamId": "L374XCGF32",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Whisp usa el micrófono durante llamadas (CallKit / POC).",
-        "UIBackgroundModes": ["audio", "voip", "audio", "voip"],
+        "UIBackgroundModes": [
+          "audio",
+          "voip",
+          "remote-notification"
+        ],
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
-        "com.apple.developer.usernotifications.time-sensitive": true
+        "com.apple.developer.usernotifications.time-sensitive": true,
+        "com.apple.developer.family-controls": true,
+        "com.apple.security.application-groups": [
+          "group.com.mvpwhisp.blocker"
+        ]
       }
     },
     "android": {
@@ -77,6 +86,28 @@
             "buildReactNativeFromSource": true
           }
         }
+      ],
+      [
+        "expo-app-blocker",
+        {
+          "ios": {
+            "appGroup": "group.com.mvpwhisp.blocker",
+            "shield": {
+              "title": "Whisp",
+              "subtitle": "{appName} está bloqueada.",
+              "primaryButtonLabel": "Volver a Whisp",
+              "secondaryButtonLabel": null,
+              "primaryButtonColor": "#2563eb",
+              "backgroundColor": "#0c0c0f",
+              "titleColor": "#fafafa",
+              "subtitleColor": "#a1a1aa"
+            }
+          },
+          "android": {
+            "notificationTitle": "Whisp — app bloqueada",
+            "notificationText": "{appName} está bloqueada."
+          }
+        }
       ]
     ],
     "experiments": {
@@ -86,7 +117,45 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "a697cd4b-0450-46a9-bacf-49f4365fa171"
+        "projectId": "a697cd4b-0450-46a9-bacf-49f4365fa171",
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "DeviceActivityMonitor",
+                  "bundleIdentifier": "com.mvpwhisp.app.DeviceActivityMonitor",
+                  "entitlements": {
+                    "com.apple.developer.family-controls": true,
+                    "com.apple.security.application-groups": [
+                      "group.com.mvpwhisp.blocker"
+                    ]
+                  }
+                },
+                {
+                  "targetName": "ShieldAction",
+                  "bundleIdentifier": "com.mvpwhisp.app.ShieldAction",
+                  "entitlements": {
+                    "com.apple.developer.family-controls": true,
+                    "com.apple.security.application-groups": [
+                      "group.com.mvpwhisp.blocker"
+                    ]
+                  }
+                },
+                {
+                  "targetName": "ShieldConfiguration",
+                  "bundleIdentifier": "com.mvpwhisp.app.ShieldConfiguration",
+                  "entitlements": {
+                    "com.apple.developer.family-controls": true,
+                    "com.apple.security.application-groups": [
+                      "group.com.mvpwhisp.blocker"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
     },
     "owner": "hdirtvep"

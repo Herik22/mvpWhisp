@@ -6,7 +6,7 @@ export default function InterruptionsPocRoute() {
     <>
       <Stack.Screen
         options={{
-          title: "Whisp Interruption POC",
+          title: "Acciones",
           headerStyle: { backgroundColor: "#0c0c0f" },
           headerTintColor: "#fafafa",
         }}
